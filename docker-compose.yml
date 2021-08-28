@@ -1,0 +1,62 @@
+version: '3.3'
+services:
+  server:
+    image: jms1989/proftpd
+    container_name: ftpserver
+    restart: always
+    volumes:
+      - /media/data/ftpdata:/home/printer
+      - ./ftpd.passwd:/etc/proftpd/ftpd.passwd
+    labels: 
+      - traefik.enable=false
+    networks:
+      ftp:
+        ipv4_address: 10.10.1.52
+
+  web:
+    container_name: ftpweb
+    image: linuxserver/nginx
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    network_mode: "service:server"
+    volumes:
+      - ./nginx/config:/config/nginx
+      - ./nginx/logs:/config/log
+      - /media/data/ftpdata:/config/www
+    labels: 
+      - traefik.enable=false
+
+  web-proxy:
+    container_name: ftpweb-proxy
+    hostname: ftpweb-proxy
+    image: linuxserver/nginx
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    networks: 
+      - proxy
+    volumes:
+      - ./nginx/config:/config/nginx
+      - ./nginx/logs:/config/log
+      - /media/data/ftpdata:/config/www
+    labels:
+      - "traefik.http.routers.ftpweb.rule=Host(`ftp.fileserver`)"
+      - "traefik.port=80"
+
+networks:
+  proxy:
+    external:
+      name: services_default
+  ftp:
+    driver: macvlan
+    driver_opts:
+      parent: enp5s0
+    ipam:
+      config:
+        - subnet: "10.10.0.0/22"
+
